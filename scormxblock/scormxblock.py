@@ -10,6 +10,9 @@ from django.conf import settings
 from django.template import Context, Template
 from webob import Response
 
+from fs.osfs import OSFS
+from djpyfs import djpyfs
+
 from xblock.core import XBlock
 from xblock.fields import Scope, String, Float, Boolean, Dict
 from xblock.fragment import Fragment
@@ -115,11 +118,17 @@ class ScormXBlock(XBlock):
         if hasattr(request.params['file'], 'file'):
             file = request.params['file'].file
             zip_file = zipfile.ZipFile(file, 'r')
-            path_to_file = os.path.join(settings.PROFILE_IMAGE_BACKEND['options']['location'], self.location.block_id)
-            if os.path.exists(path_to_file):
-                shutil.rmtree(path_to_file)
-            zip_file.extractall(path_to_file)
-            self.set_fields_xblock(path_to_file)
+            # Create a directory with a unique name in the path
+            # set it in settings.DJFS in the object directory_root
+            fs = djpyfs.get_filesystem(self.location.block_id)
+            # Extract files in the created directory
+            zip_file.extractall(fs.root_path)
+            # Get URL obtainted from settings.DJFS in the object
+            # url_root
+            url_to_file = fs.get_url(self.location.block_id)
+            
+            self.set_fields_xblock(url_to_file)
+
         return Response(json.dumps({'result': 'success'}), content_type='application/json')
 
     @XBlock.json_handler
@@ -222,15 +231,15 @@ class ScormXBlock(XBlock):
         template = Template(template_str)
         return template.render(Context(context))
 
-    def set_fields_xblock(self, path_to_file):
+    def set_fields_xblock(self, url_to_file):
         path_index_page = 'index.html'
         try:
-            tree = ET.parse('{}/imsmanifest.xml'.format(path_to_file))
+            tree = ET.parse('{}/imsmanifest.xml'.format(url_to_file))
         except IOError:
             pass
         else:
             namespace = ''
-            for node in [node for _, node in ET.iterparse('{}/imsmanifest.xml'.format(path_to_file), events=['start-ns'])]:
+            for node in [node for _, node in ET.iterparse('{}/imsmanifest.xml'.format(url_to_file), events=['start-ns'])]:
                 if node[0] == '':
                     namespace = node[1]
                     break
@@ -249,8 +258,7 @@ class ScormXBlock(XBlock):
             if (not schemaversion is None) and (re.match('^1.2$', schemaversion.text) is None):
                 self.version_scorm = 'SCORM_2004'
 
-        self.scorm_file = os.path.join(settings.PROFILE_IMAGE_BACKEND['options']['base_url'],
-                                       '{}/{}'.format(self.location.block_id, path_index_page))
+        self.scorm_file = url_to_file+"/"+path_index_page
 
     def get_completion_status(self):
         completion_status = self.lesson_status
