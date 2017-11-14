@@ -121,13 +121,19 @@ class ScormXBlock(XBlock):
             # Create a directory with a unique name in the path
             # set it in settings.DJFS in the object directory_root
             fs = djpyfs.get_filesystem(self.location.block_id)
-            # Extract files in the created directory
-            zip_file.extractall(fs.root_path)
-            # Get URL obtainted from settings.DJFS in the object
-            # url_root
-            url_to_file = fs.get_url(self.location.block_id)
-            
-            self.set_fields_xblock(url_to_file)
+
+            if fs.isdir("scorm") and not fs.isdirempty("scorm"):
+                fs.removedir("scorm", force=True)
+
+            path_to_file = "{}/{}".format(fs.root_path, "scorm")
+
+            # FMO: Aquí tenemos que solucionar lo siguiente. Al pasar el path to file a zip_file.extractall estamos volviendo
+            # a usar directamente las llamadas al sistema de archivos. Tenemos que poder guardar en s3 cuando la configuración
+            # de pyfilesystem así lo requiera
+
+            zip_file.extractall(path_to_file)
+
+            self.set_fields_xblock(path_to_file, fs.get_url(""))
 
         return Response(json.dumps({'result': 'success'}), content_type='application/json')
 
@@ -231,15 +237,21 @@ class ScormXBlock(XBlock):
         template = Template(template_str)
         return template.render(Context(context))
 
-    def set_fields_xblock(self, url_to_file):
+    def set_fields_xblock(self, path_to_file, url_to_file):
         path_index_page = 'index.html'
         try:
-            tree = ET.parse('{}/imsmanifest.xml'.format(url_to_file))
+            fs = djpyfs.get_filesystem(self.location.block_id)
+            manifest = fs.getcontents("scorm/imsmanifest.xml")
+
+            # FMO: Aquí es necesario solucionar lo siguiente. ET.parse busca leer un archivo, lo cual no tenemos, tenemos el contenido
+            # según fue leido por fs.getcontents. Tenemos que reemplazar esa llamada a ET.iterparse para obtener el nombre de path_index_page bien.
+
+            tree = ET.parse('{}/imsmanifest.xml'.format(path_to_file))
         except IOError:
             pass
         else:
             namespace = ''
-            for node in [node for _, node in ET.iterparse('{}/imsmanifest.xml'.format(url_to_file), events=['start-ns'])]:
+            for node in [node for _, node in ET.iterparse('{}/imsmanifest.xml'.format(path_to_file), events=['start-ns'])]:
                 if node[0] == '':
                     namespace = node[1]
                     break
@@ -258,7 +270,7 @@ class ScormXBlock(XBlock):
             if (not schemaversion is None) and (re.match('^1.2$', schemaversion.text) is None):
                 self.version_scorm = 'SCORM_2004'
 
-        self.scorm_file = url_to_file+"/"+path_index_page
+        self.scorm_file = "{}/{}".format(url_to_file, path_index_page)
 
     def get_completion_status(self):
         completion_status = self.lesson_status
