@@ -1,10 +1,18 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import json
 import re
 import os
 import pkg_resources
 import zipfile
+import fs
+import hashlib
 import shutil
+import traceback
 import xml.etree.ElementTree as ET
+
+from uuid import uuid4
 
 from django.conf import settings
 from django.template import Context, Template
@@ -12,6 +20,7 @@ from webob import Response
 
 from fs.osfs import OSFS
 from djpyfs import djpyfs
+from fs.opener import fsopendir, opener
 
 from xblock.core import XBlock
 from xblock.fields import Scope, String, Float, Boolean, Dict
@@ -22,6 +31,8 @@ _ = lambda text: text
 
 
 class ScormXBlock(XBlock):
+
+    # fs = djpyfs.get_filesystem("scorm")
 
     display_name = String(
         display_name=_("Display Name"),
@@ -241,35 +252,30 @@ class ScormXBlock(XBlock):
         path_index_page = 'index.html'
         try:
             fs = djpyfs.get_filesystem(self.location.block_id)
-            manifest = fs.getcontents("scorm/imsmanifest.xml")
-
-            # FMO: Aquí es necesario solucionar lo siguiente. ET.parse busca leer un archivo, lo cual no tenemos, tenemos el contenido
-            # según fue leido por fs.getcontents. Tenemos que reemplazar esa llamada a ET.iterparse para obtener el nombre de path_index_page bien.
-
-            tree = ET.parse('{}/imsmanifest.xml'.format(path_to_file))
-        except IOError:
-            pass
-        else:
-            namespace = ''
-            for node in [node for _, node in ET.iterparse('{}/imsmanifest.xml'.format(path_to_file), events=['start-ns'])]:
-                if node[0] == '':
-                    namespace = node[1]
-                    break
-            root = tree.getroot()
+            manifest = fs.getcontents(url_to_file+"/imsmanifest.xml")
+            tree = ET.fromstring(manifest)
+            namespace = tree.tag.split('}')[0].strip('{')
+            # By standard a namesapace it's a URI
+            # we ensure the namespace got in the tree object it's a URL
+            # if not we return an empty namespace and procced to look for resource tag
+            if not namespace.startswith("http"):
+                namespace = None
 
             if namespace:
-                resource = root.find('{{{0}}}resources/{{{0}}}resource'.format(namespace))
-                schemaversion = root.find('{{{0}}}metadata/{{{0}}}schemaversion'.format(namespace))
+                resource = tree.find('{{{0}}}resources/{{{0}}}resource'.format(namespace))
+                schemaversion = tree.find('{{{0}}}metadata/{{{0}}}schemaversion'.format(namespace))
             else:
-                resource = root.find('resources/resource')
-                schemaversion = root.find('metadata/schemaversion')
-
-            if resource:
-                path_index_page = resource.get('href')
+                resource = tree.find('resources/resource')
+                schemaversion = tree.find('metadata/schemaversion')
 
             if (not schemaversion is None) and (re.match('^1.2$', schemaversion.text) is None):
                 self.version_scorm = 'SCORM_2004'
-
+            
+            path_index_page = resource.get("href")
+        
+        except IOError:
+            pass
+        
         self.scorm_file = "{}/{}".format(url_to_file, path_index_page)
 
     def get_completion_status(self):
