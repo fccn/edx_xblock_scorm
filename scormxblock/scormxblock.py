@@ -18,13 +18,16 @@ from django.conf import settings
 from django.template import Context, Template
 from webob import Response
 
+from fs.tempfs import TempFS
 from fs.osfs import OSFS
-from djpyfs import djpyfs
 from fs.opener import fsopendir, opener
+from fs.utils import copydir,copyfile, movedir
+from djpyfs import djpyfs
 
 from xblock.core import XBlock
 from xblock.fields import Scope, String, Float, Boolean, Dict
 from xblock.fragment import Fragment
+
 
 # Make '_' a no-op so we can scrape strings
 _ = lambda text: text
@@ -129,22 +132,23 @@ class ScormXBlock(XBlock):
         if hasattr(request.params['file'], 'file'):
             file = request.params['file'].file
             zip_file = zipfile.ZipFile(file, 'r')
-            # Create a directory with a unique name in the path
-            # set it in settings.DJFS in the object directory_root
+            # Create filesystem object. The filesystem type
+            # comes from settings. OSFS or S3.
             fs = djpyfs.get_filesystem(self.location.block_id)
+            
+            # Create a temporaray directory where the zip will extract.
+            # The only purpose of create a temp directory  it's to extract
+            # the files, because it does not help us to have the files in HD.
+            tem_directory = TempFS()
+            # Extract the files in the temp directory just created.
+            zip_file.extractall(tem_directory.root_path)
+            # Due to we not need the files in the hard drive, it's neccesary
+            # copy the files extracted in the filesystem object created.
+            copydir(tem_directory, fs, overwrite=True)
+            # Destroy temp directory after all files are copied.
+            tem_directory.close()
 
-            if fs.isdir("scorm") and not fs.isdirempty("scorm"):
-                fs.removedir("scorm", force=True)
-
-            path_to_file = "{}/{}".format(fs.root_path, "scorm")
-
-            # FMO: Aquí tenemos que solucionar lo siguiente. Al pasar el path to file a zip_file.extractall estamos volviendo
-            # a usar directamente las llamadas al sistema de archivos. Tenemos que poder guardar en s3 cuando la configuración
-            # de pyfilesystem así lo requiera
-
-            zip_file.extractall(path_to_file)
-
-            self.set_fields_xblock(path_to_file, fs.get_url(""))
+            self.set_fields_xblock(fs.get_url(""))
 
         return Response(json.dumps({'result': 'success'}), content_type='application/json')
 
@@ -248,11 +252,11 @@ class ScormXBlock(XBlock):
         template = Template(template_str)
         return template.render(Context(context))
 
-    def set_fields_xblock(self, path_to_file, url_to_file):
+    def set_fields_xblock(self, url_to_file):
         path_index_page = 'index.html'
         try:
             fs = djpyfs.get_filesystem(self.location.block_id)
-            manifest = fs.getcontents(url_to_file+"/imsmanifest.xml")
+            manifest = fs.getcontents("/imsmanifest.xml")
             tree = ET.fromstring(manifest)
             namespace = tree.tag.split('}')[0].strip('{')
             # By standard a namesapace it's a URI
