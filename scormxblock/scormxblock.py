@@ -3,25 +3,15 @@
 
 import json
 import re
-import os
 import pkg_resources
 import zipfile
-import fs
-import hashlib
-import shutil
-import traceback
 import xml.etree.ElementTree as ET
-
-from uuid import uuid4
 
 from django.conf import settings
 from django.template import Context, Template
 from webob import Response
 
 from fs.tempfs import TempFS
-from fs.osfs import OSFS
-from fs.opener import fsopendir, opener
-from fs.utils import copydir,copyfile, movedir
 from djpyfs import djpyfs
 
 from xblock.core import XBlock
@@ -135,7 +125,6 @@ class ScormXBlock(XBlock):
             # Create filesystem object. The filesystem type
             # comes from settings. OSFS or S3.
             fs = djpyfs.get_filesystem(self.location.block_id)
-            
             # Create a temporaray directory where the zip will extract.
             # The only purpose of create a temp directory  it's to extract
             # the files, because it does not help us to have the files in HD.
@@ -258,9 +247,13 @@ class ScormXBlock(XBlock):
             fs = djpyfs.get_filesystem(self.location.block_id)
             manifest = fs.getcontents("/imsmanifest.xml")
             tree = ET.fromstring(manifest)
+
+            # Getting the namespace from the tree does not have a clean API.
+            # We use the simplest method outlined here: https://stackoverflow.com/a/28283119/2072496
             namespace = tree.tag.split('}')[0].strip('{')
+
             # By standard a namesapace it's a URI
-            # we ensure the namespace got in the tree object it's a URL
+            # we ensure the namespace we got in the tree object it's in fact a URL
             # if not we return an empty namespace and procced to look for resource tag
             if not namespace.startswith("http"):
                 namespace = None
@@ -274,12 +267,12 @@ class ScormXBlock(XBlock):
 
             if (not schemaversion is None) and (re.match('^1.2$', schemaversion.text) is None):
                 self.version_scorm = 'SCORM_2004'
-            
+
             path_index_page = resource.get("href")
-        
+
         except IOError:
             pass
-        
+
         self.scorm_file = "{}/{}".format(url_to_file, path_index_page)
 
     def get_completion_status(self):
