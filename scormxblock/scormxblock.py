@@ -26,8 +26,6 @@ _ = lambda text: text
 
 class ScormXBlock(XBlock):
 
-    # fs = djpyfs.get_filesystem("scorm")
-
     display_name = String(
         display_name=_("Display Name"),
         help=_("Display name for this module"),
@@ -232,6 +230,12 @@ class ScormXBlock(XBlock):
         scorm_file_path = ''
         if self.scorm_file:
             scorm_file_path = fs.get_url(self.scorm_file)
+
+        # Required when working with a S3 djfs confifuguration and a proxy for the files
+        # so that the Same-origin security policy does not block the files
+        if settings.DJFS.get('use_proxy', False):
+            proxy_file = fs.get_url(self.scorm_file).split(settings.DJFS.get('prefix'))[-1]
+            scorm_file_path = "/{}{}".format(settings.DJFS.get('proxy_root'), proxy_file)
 
         return {
             'scorm_file_path': scorm_file_path,
