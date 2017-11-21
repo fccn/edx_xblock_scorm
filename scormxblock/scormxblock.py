@@ -12,6 +12,7 @@ from django.template import Context, Template
 from webob import Response
 
 from fs.tempfs import TempFS
+from fs.utils import copydir
 from djpyfs import djpyfs
 
 from xblock.core import XBlock
@@ -128,16 +129,16 @@ class ScormXBlock(XBlock):
             # Create a temporaray directory where the zip will extract.
             # The only purpose of create a temp directory  it's to extract
             # the files, because it does not help us to have the files in HD.
-            tem_directory = TempFS()
+            temp_directory = TempFS()
             # Extract the files in the temp directory just created.
-            zip_file.extractall(tem_directory.root_path)
+            zip_file.extractall(temp_directory.root_path)
             # Due to we not need the files in the hard drive, it's neccesary
             # copy the files extracted in the filesystem object created.
-            copydir(tem_directory, fs, overwrite=True)
+            copydir(temp_directory, fs, overwrite=True)
             # Destroy temp directory after all files are copied.
-            tem_directory.close()
+            temp_directory.close()
 
-            self.set_fields_xblock(fs.get_url(""))
+            self.set_fields_xblock()
 
         return Response(json.dumps({'result': 'success'}), content_type='application/json')
 
@@ -223,10 +224,14 @@ class ScormXBlock(XBlock):
         }
 
     def get_context_student(self):
+        """
+        Returns the necessary context to display the units when in the LMS
+        """
+        fs = djpyfs.get_filesystem(self.location.block_id)
+
         scorm_file_path = ''
         if self.scorm_file:
-            scheme = 'https' if settings.HTTPS == 'on' else 'http'
-            scorm_file_path = '{}://{}{}'.format(scheme, settings.ENV_TOKENS.get('LMS_BASE'), self.scorm_file)
+            scorm_file_path = fs.get_url(self.scorm_file)
 
         return {
             'scorm_file_path': scorm_file_path,
@@ -241,7 +246,7 @@ class ScormXBlock(XBlock):
         template = Template(template_str)
         return template.render(Context(context))
 
-    def set_fields_xblock(self, url_to_file):
+    def set_fields_xblock(self):
         path_index_page = 'index.html'
         try:
             fs = djpyfs.get_filesystem(self.location.block_id)
@@ -273,7 +278,7 @@ class ScormXBlock(XBlock):
         except IOError:
             pass
 
-        self.scorm_file = "{}/{}".format(url_to_file, path_index_page)
+        self.scorm_file = path_index_page
 
     def get_completion_status(self):
         completion_status = self.lesson_status
