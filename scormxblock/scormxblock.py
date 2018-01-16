@@ -278,6 +278,8 @@ class ScormXBlock(XBlock):
         if settings.DJFS.get('remove_signature', False):
             scorm_file_path = urlparse.urljoin(scorm_file_path, urlparse.urlparse(scorm_file_path).path)
 
+        scorm_file_path = urlparse.unquote(scorm_file_path)
+
         return {
             'scorm_file_path': scorm_file_path,
             'lesson_score': self.lesson_score,
