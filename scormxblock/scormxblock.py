@@ -6,6 +6,10 @@ import re
 import pkg_resources
 import zipfile
 import xml.etree.ElementTree as ET
+import urlparse
+import boto
+
+from os import path, walk
 
 from django.conf import settings
 from django.template import Context, Template
@@ -109,36 +113,70 @@ class ScormXBlock(XBlock):
         return frag
 
     def author_view(self, context):
-        html = self.resource_string("static/html/author_view.html")
+        context_html = self.get_context_student()
+        html = self.render_template('static/html/author_view.html', context_html)
         frag = Fragment(html)
         return frag
 
     @XBlock.handler
     def studio_submit(self, request, suffix=''):
+
         self.display_name = request.params['display_name']
         self.has_score = request.params['has_score']
         self.icon_class = 'problem' if self.has_score == 'True' else 'video'
         if hasattr(request.params['file'], 'file'):
             file = request.params['file'].file
             zip_file = zipfile.ZipFile(file, 'r')
-            # Create filesystem object. The filesystem type
-            # comes from settings. OSFS or S3.
-            fs = djpyfs.get_filesystem(self.location.block_id)
+
             # Create a temporaray directory where the zip will extract.
-            # The only purpose of create a temp directory  it's to extract
-            # the files, because it does not help us to have the files in HD.
             temp_directory = TempFS()
+
             # Extract the files in the temp directory just created.
             zip_file.extractall(temp_directory.root_path)
-            # Due to we not need the files in the hard drive, it's neccesary
-            # copy the files extracted in the filesystem object created.
-            copydir(temp_directory, fs, overwrite=True)
+
+            manifest_path = '{}/imsmanifest.xml'.format(temp_directory.root_path)
+            with open(manifest_path, 'r') as manifest_file:
+                manifest = manifest_file.read()
+            manifest_file.closed
+            self.set_fields_xblock(manifest)
+
+            # Now the part where we copy the data fast fast fast
+            fs = djpyfs.get_filesystem(self.location.block_id)
+            self.updoad_all_content(temp_directory, fs)
+
             # Destroy temp directory after all files are copied.
             temp_directory.close()
 
-            self.set_fields_xblock()
-
         return Response(json.dumps({'result': 'success'}), content_type='application/json')
+
+    def updoad_all_content(self, temp_directory, fs):
+        """
+        Handles the bulk upload of unzipped content.
+        It uses a direct boto connection for performance reasons
+        """
+        if not settings.DJFS.get('type', 'osfs') == "s3fs":
+            copydir(temp_directory, fs, overwrite=True)
+            return
+
+        conn = boto.connect_s3(settings.DJFS.get('aws_access_key_id'), settings.DJFS.get('aws_secret_access_key'))
+        bucket = conn.get_bucket(settings.DJFS.get('bucket'))
+        dest_dir = fs._s3path("")
+
+        all_content = []
+        for dir_, _, files in walk(temp_directory.root_path):
+            for filename in files:
+                rel_dir = path.relpath(dir_, temp_directory.root_path)
+                rel_file = path.join(rel_dir, filename)
+                all_content.append(rel_file)
+
+        for filepath in all_content:
+            sourcepath = path.join(temp_directory.root_path, filepath)
+            destpath = path.normpath(path.join(dest_dir, filepath))
+
+            k = boto.s3.key.Key(bucket)
+            k.key = destpath
+            k.set_contents_from_filename(sourcepath)
+            # k.set_acl('public-read')  # Slows calls drastically
 
     @XBlock.json_handler
     def scorm_get_value(self, data, suffix=''):
@@ -237,6 +275,9 @@ class ScormXBlock(XBlock):
             proxy_file = fs.get_url(self.scorm_file).split(settings.DJFS.get('prefix'))[-1]
             scorm_file_path = "/{}{}".format(settings.DJFS.get('proxy_root'), proxy_file)
 
+        if settings.DJFS.get('remove_signature', False):
+            scorm_file_path = urlparse.urljoin(scorm_file_path, urlparse.urlparse(scorm_file_path).path)
+
         return {
             'scorm_file_path': scorm_file_path,
             'lesson_score': self.lesson_score,
@@ -250,11 +291,9 @@ class ScormXBlock(XBlock):
         template = Template(template_str)
         return template.render(Context(context))
 
-    def set_fields_xblock(self):
+    def set_fields_xblock(self, manifest):
         path_index_page = 'index.html'
         try:
-            fs = djpyfs.get_filesystem(self.location.block_id)
-            manifest = fs.getcontents("/imsmanifest.xml")
             tree = ET.fromstring(manifest)
 
             # Getting the namespace from the tree does not have a clean API.
