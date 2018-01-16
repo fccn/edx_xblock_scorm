@@ -272,7 +272,7 @@ class ScormXBlock(XBlock):
         # Required when working with a S3 djfs confifuguration and a proxy for the files
         # so that the Same-origin security policy does not block the files
         if settings.DJFS.get('use_proxy', False):
-            proxy_file = fs.get_url(self.scorm_file).split(settings.DJFS.get('prefix'))[-1]
+            proxy_file = scorm_file_path.split(settings.DJFS.get('prefix'))[-1]
             scorm_file_path = "/{}{}".format(settings.DJFS.get('proxy_root'), proxy_file)
 
         if settings.DJFS.get('remove_signature', False):
