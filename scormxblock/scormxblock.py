@@ -30,7 +30,7 @@ _ = lambda text: text
 FILES_THRESHOLD_FOR_ASYNC = 150
 
 
-@task()
+@task(name=u'scormxblock.scormxblock.s3_upload', routing_key=settings.HIGH_PRIORITY_QUEUE)
 def s3_upload(all_content, temp_directory, dest_dir):
     """
     Actual handling of the s3 uploads.
@@ -70,7 +70,7 @@ def updoad_all_content(temp_directory, fs):
         s3_upload(all_content, temp_directory, dest_dir)
     else:
         # The raw number of files is going to make this request time out. Use celery instead
-        s3_upload.delay(all_content, temp_directory, dest_dir)
+        s3_upload.apply_async((all_content, temp_directory, dest_dir), serializer='pickle')
 
 
 class ScormXBlock(XBlock):
