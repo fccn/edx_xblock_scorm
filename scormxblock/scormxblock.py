@@ -15,6 +15,7 @@ from django.conf import settings
 from django.template import Context, Template
 from webob import Response
 
+from celery.task import task
 from fs.tempfs import TempFS
 from fs.utils import copydir
 from djpyfs import djpyfs
@@ -26,6 +27,50 @@ from xblock.fragment import Fragment
 
 # Make '_' a no-op so we can scrape strings
 _ = lambda text: text
+FILES_THRESHOLD_FOR_ASYNC = 150
+
+
+@task()
+def s3_upload(all_content, temp_directory, dest_dir):
+    """
+    Actual handling of the s3 uploads.
+    It uses a direct boto connection for performance reasons
+    """
+    conn = boto.connect_s3(settings.DJFS.get('aws_access_key_id'), settings.DJFS.get('aws_secret_access_key'))
+    bucket = conn.get_bucket(settings.DJFS.get('bucket'))
+
+    for filepath in all_content:
+        sourcepath = path.join(temp_directory.root_path, filepath)
+        destpath = path.normpath(path.join(dest_dir, filepath))
+
+        k = boto.s3.key.Key(bucket)
+        k.key = destpath
+        k.set_contents_from_filename(sourcepath)
+        # k.set_acl('public-read')  # Slows calls drastically
+
+
+def updoad_all_content(temp_directory, fs):
+    """
+    This standalone function handles the bulk upload of unzipped content.
+    """
+    if not settings.DJFS.get('type', 'osfs') == "s3fs":
+        copydir(temp_directory, fs, overwrite=True)
+        return
+
+    dest_dir = fs._s3path("")
+    all_content = []
+    for dir_, _, files in walk(temp_directory.root_path):
+        for filename in files:
+            rel_dir = path.relpath(dir_, temp_directory.root_path)
+            rel_file = path.join(rel_dir, filename)
+            all_content.append(rel_file)
+
+    if len(all_content) < FILES_THRESHOLD_FOR_ASYNC:
+        # We estimate no problem here, just upload the files
+        s3_upload(all_content, temp_directory, dest_dir)
+    else:
+        # The raw number of files is going to make this request time out. Use celery instead
+        s3_upload.delay(all_content, temp_directory, dest_dir)
 
 
 class ScormXBlock(XBlock):
@@ -142,41 +187,12 @@ class ScormXBlock(XBlock):
 
             # Now the part where we copy the data fast fast fast
             fs = djpyfs.get_filesystem(self.location.block_id)
-            self.updoad_all_content(temp_directory, fs)
+            updoad_all_content(temp_directory, fs)
 
             # Destroy temp directory after all files are copied.
             temp_directory.close()
 
         return Response(json.dumps({'result': 'success'}), content_type='application/json')
-
-    def updoad_all_content(self, temp_directory, fs):
-        """
-        Handles the bulk upload of unzipped content.
-        It uses a direct boto connection for performance reasons
-        """
-        if not settings.DJFS.get('type', 'osfs') == "s3fs":
-            copydir(temp_directory, fs, overwrite=True)
-            return
-
-        conn = boto.connect_s3(settings.DJFS.get('aws_access_key_id'), settings.DJFS.get('aws_secret_access_key'))
-        bucket = conn.get_bucket(settings.DJFS.get('bucket'))
-        dest_dir = fs._s3path("")
-
-        all_content = []
-        for dir_, _, files in walk(temp_directory.root_path):
-            for filename in files:
-                rel_dir = path.relpath(dir_, temp_directory.root_path)
-                rel_file = path.join(rel_dir, filename)
-                all_content.append(rel_file)
-
-        for filepath in all_content:
-            sourcepath = path.join(temp_directory.root_path, filepath)
-            destpath = path.normpath(path.join(dest_dir, filepath))
-
-            k = boto.s3.key.Key(bucket)
-            k.key = destpath
-            k.set_contents_from_filename(sourcepath)
-            # k.set_acl('public-read')  # Slows calls drastically
 
     @XBlock.json_handler
     def scorm_get_value(self, data, suffix=''):
