@@ -40,7 +40,7 @@ def s3_upload(all_content, temp_directory, dest_dir):
     bucket = conn.get_bucket(settings.DJFS.get('bucket'))
 
     for filepath in all_content:
-        sourcepath = path.join(temp_directory.root_path, filepath)
+        sourcepath = path.normpath(path.join(temp_directory.root_path, filepath))
         destpath = path.normpath(path.join(dest_dir, filepath))
 
         k = boto.s3.key.Key(bucket)
