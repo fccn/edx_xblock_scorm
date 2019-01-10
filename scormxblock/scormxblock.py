@@ -17,7 +17,6 @@ from webob import Response
 
 from celery.task import task
 from fs.tempfs import TempFS
-from fs.utils import copydir
 from djpyfs import djpyfs
 
 from xblock.core import XBlock
@@ -54,6 +53,9 @@ def updoad_all_content(temp_directory, fs):
     This standalone function handles the bulk upload of unzipped content.
     """
     if not settings.DJFS.get('type', 'osfs') == "s3fs":
+        # Temporary fix
+        # TODO: find a better solution for ImportError: No module named fs.utils
+        from fs.utils import copydir
         copydir(temp_directory, fs, overwrite=True)
         return
 
