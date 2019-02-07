@@ -59,7 +59,7 @@ def updoad_all_content(temp_directory, fs):
         copydir(temp_directory, fs, overwrite=True)
         return
 
-    dest_dir = fs._s3path("")
+    dest_dir = fs.dir_path
     all_content = []
     for dir_, _, files in walk(temp_directory.root_path):
         for filename in files:
