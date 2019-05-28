@@ -145,7 +145,7 @@ class ScormXBlock(XBlock):
         frag.add_css(self.resource_string("static/css/scormxblock.css"))
         frag.add_javascript(self.resource_string("static/js/src/scormxblock.js"))
         settings = {
-            'version_scorm': self.version_scorm
+            'version_scorm': "SCORM_12"
         }
         frag.initialize_js('ScormXBlock', json_args=settings)
         return frag
