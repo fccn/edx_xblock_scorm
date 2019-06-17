@@ -55,8 +55,8 @@ def updoad_all_content(temp_directory, fs):
     if not settings.DJFS.get('type', 'osfs') == "s3fs":
         # Temporary fix
         # TODO: find a better solution for ImportError: No module named fs.utils
-        from fs.utils import copydir
-        copydir(temp_directory, fs, overwrite=True)
+        from fs.copy import copy_fs
+        copy_fs(temp_directory, fs)
         return
 
     dest_dir = fs.dir_path
@@ -196,19 +196,18 @@ class ScormXBlock(XBlock):
 
         return Response(json.dumps({'result': 'success'}), content_type='application/json')
 
-    @XBlock.json_handler
-    def scorm_get_value(self, data, suffix=''):
-        name = data.get('name')
-        if name in ['cmi.core.lesson_status', 'cmi.completion_status']:
-            return {'value': self.lesson_status}
-        elif name == 'cmi.success_status':
-            return {'value': self.success_status}
-        elif name == 'cmi.core.lesson_location':
-            return {'value': self.lesson_location}
-        elif name == 'cmi.suspend_data':
-            return {'value': self.suspend_data}
-        else:
-            return {'value': self.data_scorm.get(name, '')}
+    @XBlock.handler
+    def scorm_get_values(self, request=None, suffix=None):
+        values = {
+            'cmi.core.lesson_status': self.lesson_status,
+            'cmi.completion_status': self.lesson_status,
+            'cmi.success_status': self.success_status,
+            'cmi.core.lesson_location': self.lesson_location,
+            'cmi.suspend_data': self.suspend_data,
+        }
+
+        values.update(self.data_scorm)
+        return Response(json.dumps(values), content_type='application/json')
 
     @XBlock.json_handler
     def scorm_set_value(self, data, suffix=''):
@@ -230,11 +229,11 @@ class ScormXBlock(XBlock):
                 context.update({"lesson_score": self.lesson_score})
 
         elif name in ['cmi.core.score.raw', 'cmi.score.raw'] and self.has_score:
-            self.lesson_score = int(data.get('value', 0))/100.0
+            self.lesson_score = int(data.get('value', 0)) / 100.0
             context.update({"lesson_score": self.lesson_score})
 
         elif name == 'cmi.core.lesson_location':
-            self.lesson_location = data.get('value', '')
+            self.lesson_location = str(data.get('value', ''))
 
         elif name == 'cmi.suspend_data':
             self.suspend_data = data.get('value', '')

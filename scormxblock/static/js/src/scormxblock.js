@@ -71,18 +71,28 @@ function ScormXBlock(runtime, element, settings) {
     }
   }
 
-  var GetValue = function (cmi_element) {
-    var handlerUrl = runtime.handlerUrl(element, 'scorm_get_value');
+  var values = null;
 
-    var response = $.ajax({
-      type: "POST",
-      url: handlerUrl,
-      data: JSON.stringify({'name': cmi_element}),
-      async: false
-    });
-    response = JSON.parse(response.responseText);
-    console.log("Getvalue for " + cmi_element + " = " + response.value);
-    return response.value
+  var GetValue = function (cmi_element) {
+    var handlerUrl = runtime.handlerUrl(element, 'scorm_get_values');
+
+    if (values==null) {
+      var response = $.ajax({
+        type: "GET",
+        url: handlerUrl,
+        async: false
+      });
+      values = JSON.parse(response.responseText);
+    }
+
+    var value = values[cmi_element];
+
+    if (value==undefined){
+      value = '';
+    }
+
+    console.log("Getvalue for " + cmi_element + " = " + value);
+    return value
   };
 
   var SetValue = function (cmi_element, value) {
