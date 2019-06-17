@@ -15,10 +15,7 @@ function ScormXBlock(runtime, element, settings) {
     this.LMSGetValue = GetValue;
     this.LMSSetValue = SetValue;
 
-    this.LMSCommit = function() {
-        console.log("LMSCommit");
-        return "true";
-    };
+    this.LMSCommit = Commit;
 
     this.LMSGetLastError = function() {
       console.log("GetLastError");
@@ -50,10 +47,7 @@ function ScormXBlock(runtime, element, settings) {
     this.GetValue = GetValue;
     this.SetValue = SetValue;
 
-    this.Commit = function() {
-        console.log("LMSCommit");
-        return "true";
-    };
+    this.Commit = Commit;
 
     this.GetLastError = function() {
       console.log("GetLastError");
@@ -72,6 +66,7 @@ function ScormXBlock(runtime, element, settings) {
   }
 
   var values = null;
+  var LMSValues = {};
 
   var GetValue = function (cmi_element) {
     var handlerUrl = runtime.handlerUrl(element, 'scorm_get_values');
@@ -97,12 +92,18 @@ function ScormXBlock(runtime, element, settings) {
 
   var SetValue = function (cmi_element, value) {
     console.log("LMSSetValue " + cmi_element + " = " + value);
-    var handlerUrl = runtime.handlerUrl( element, 'scorm_set_value');
+    LMSValues[cmi_element] = value
+    return "true";
+  };
+
+  var Commit = function () {
+    console.log("LMSCommit")
+    var handlerUrl = runtime.handlerUrl( element, 'scorm_set_values');
 
     $.ajax({
       type: "POST",
       url: handlerUrl,
-      data: JSON.stringify({'name': cmi_element, 'value': value}),
+      data: JSON.stringify(LMSValues),
       async: false,
       success: function(response){
         if (typeof response.lesson_score != "undefined"){

@@ -210,40 +210,40 @@ class ScormXBlock(XBlock):
         return Response(json.dumps(values), content_type='application/json')
 
     @XBlock.json_handler
-    def scorm_set_value(self, data, suffix=''):
+    def scorm_set_values(self, data, suffix=''):
         context = {'result': 'success'}
-        name = data.get('name')
 
-        if name in ['cmi.core.lesson_status', 'cmi.completion_status']:
-            self.lesson_status = data.get('value')
-            if self.has_score and data.get('value') in ['completed', 'failed', 'passed']:
-                self.publish_grade()
+        for name, value in data.iteritems():
+            if name in ['cmi.core.lesson_status', 'cmi.completion_status']:
+                self.lesson_status = value
+                if self.has_score and value in ['completed', 'failed', 'passed']:
+                    self.publish_grade()
+                    context.update({"lesson_score": self.lesson_score})
+
+            elif name == 'cmi.success_status':
+                self.success_status = value
+                if self.has_score:
+                    if self.success_status == 'unknown':
+                        self.lesson_score = 0
+                    self.publish_grade()
+                    context.update({"lesson_score": self.lesson_score})
+
+            elif name in ['cmi.core.score.raw', 'cmi.score.raw'] and self.has_score:
+                self.lesson_score = int(data.get('value', 0)) / 100.0
                 context.update({"lesson_score": self.lesson_score})
 
-        elif name == 'cmi.success_status':
-            self.success_status = data.get('value')
-            if self.has_score:
-                if self.success_status == 'unknown':
-                    self.lesson_score = 0
-                self.publish_grade()
-                context.update({"lesson_score": self.lesson_score})
+            elif name == 'cmi.core.lesson_location':
+                self.lesson_location = str(data.get('value', ''))
 
-        elif name in ['cmi.core.score.raw', 'cmi.score.raw'] and self.has_score:
-            self.lesson_score = int(data.get('value', 0)) / 100.0
-            context.update({"lesson_score": self.lesson_score})
+            elif name == 'cmi.suspend_data':
+                self.suspend_data = data.get('value', '')
 
-        elif name == 'cmi.core.lesson_location':
-            self.lesson_location = str(data.get('value', ''))
+            elif name.startswith('cmi.interactions.'):
+                self.data_scorm['cmi.interactions._count'] = self.data_scorm.get('cmi.interactions._count', 0) + 1
+                self.data_scorm[name] = data.get('value', '')
 
-        elif name == 'cmi.suspend_data':
-            self.suspend_data = data.get('value', '')
-
-        elif name.startswith('cmi.interactions.'):
-            self.data_scorm['cmi.interactions._count'] = self.data_scorm.get('cmi.interactions._count', 0) + 1
-            self.data_scorm[name] = data.get('value', '')
-
-        else:
-            self.data_scorm[name] = data.get('value', '')
+            else:
+                self.data_scorm[name] = data.get('value', '')
 
         context.update({"completion_status": self.get_completion_status()})
         return context
