@@ -229,21 +229,21 @@ class ScormXBlock(XBlock):
                     context.update({"lesson_score": self.lesson_score})
 
             elif name in ['cmi.core.score.raw', 'cmi.score.raw'] and self.has_score:
-                self.lesson_score = int(data.get('value', 0)) / 100.0
+                self.lesson_score = int(value) / 100.0
                 context.update({"lesson_score": self.lesson_score})
 
             elif name == 'cmi.core.lesson_location':
-                self.lesson_location = str(data.get('value', ''))
+                self.lesson_location = str(value)
 
             elif name == 'cmi.suspend_data':
-                self.suspend_data = data.get('value', '')
+                self.suspend_data = value
 
             elif name.startswith('cmi.interactions.'):
                 self.data_scorm['cmi.interactions._count'] = self.data_scorm.get('cmi.interactions._count', 0) + 1
-                self.data_scorm[name] = data.get('value', '')
+                self.data_scorm[name] = value
 
             else:
-                self.data_scorm[name] = data.get('value', '')
+                self.data_scorm[name] = value
 
         context.update({"completion_status": self.get_completion_status()})
         return context

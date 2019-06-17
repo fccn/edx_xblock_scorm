@@ -9,13 +9,16 @@ function ScormXBlock(runtime, element, settings) {
 
     this.LMSFinish = function() {
       console.log("LMSFinish");
-      return "true";
+      return StoreValues();
     };
 
     this.LMSGetValue = GetValue;
     this.LMSSetValue = SetValue;
 
-    this.LMSCommit = Commit;
+    this.LMSCommit = function() {
+      console.log("LMSCommit")
+      return StoreValues();
+    };
 
     this.LMSGetLastError = function() {
       console.log("GetLastError");
@@ -41,13 +44,16 @@ function ScormXBlock(runtime, element, settings) {
 
     this.Terminate = function() {
       console.log("LMSFinish");
-      return "true";
+      return StoreValues();
     };
 
     this.GetValue = GetValue;
     this.SetValue = SetValue;
 
-    this.Commit = Commit;
+    this.Commit = function() {
+      console.log("LMSCommit")
+      return StoreValues();
+    };
 
     this.GetLastError = function() {
       console.log("GetLastError");
@@ -96,8 +102,7 @@ function ScormXBlock(runtime, element, settings) {
     return "true";
   };
 
-  var Commit = function () {
-    console.log("LMSCommit")
+  var StoreValues = function () {
     var handlerUrl = runtime.handlerUrl( element, 'scorm_set_values');
 
     $.ajax({
@@ -110,6 +115,7 @@ function ScormXBlock(runtime, element, settings) {
           $(".lesson_score", element).html(response.lesson_score);
         }
         $(".completion_status", element).html(response.completion_status);
+        LMSValues = {};
       }
     });
 
