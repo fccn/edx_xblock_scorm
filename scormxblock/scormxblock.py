@@ -28,6 +28,77 @@ from xblock.fragment import Fragment
 _ = lambda text: text
 FILES_THRESHOLD_FOR_ASYNC = 150
 
+WRITE_MODEL_DATA = [
+    'cmi.core.lesson_location',
+    'cmi.core.lesson_status',
+    'cmi.core.score.raw',
+    'cmi.core.score.max',
+    'cmi.core.score.min',
+    'cmi.core.exit',
+    'cmi.core.session_time',
+    'cmi.suspend_data',
+    'cmi.comments',
+    'cmi.objectives.n.id',
+    'cmi.objectives.n.score.raw',
+    'cmi.objectives.n.score.max',
+    'cmi.objectives.n.score.min',
+    'cmi.objectives.n.status',
+    'cmi.student_preference.audio',
+    'cmi.student_preference.language',
+    'cmi.student_preference.speed',
+    'cmi.student_preference.text',
+    'cmi.interactions.n.id',
+    'cmi.interactions.n.objectives.n.id',
+    'cmi.interactions.n.time',
+    'cmi.interactions.n.type'
+    'cmi.interactions.n.correct_responses.n.pattern',
+    'cmi.interactions.n.weighting',
+    'cmi.interactions.n.student_response',
+    'cmi.interactions.n.result',
+    'cmi.interactions.n.latency',
+]
+
+READ_MODEL_DATA = [
+    'cmi.core._children',
+    'cmi.core.student_id',
+    'cmi.core.student_name',
+    'cmi.core.credit',
+    'cmi.core.entry',
+    'cmi.core.score_children',
+    'cmi.core.lesson_status',
+    'cmi.core.score.raw',
+    'cmi.core.lesson_location',
+    'cmi.core.score.max',
+    'cmi.core.score.min',
+    'cmi.core.total_time',
+    'cmi.core.lesson_mode',
+    'cmi.suspend_data',
+    'cmi.launch_data',
+    'cmi.comments',
+    'cmi.comments_from_lms',
+    'cmi.objectives._children',
+    'cmi.objectives._count',
+    'cmi.objectives.n.id',
+    'cmi.objectives.n.score._children',
+    'cmi.objectives.n.score.raw',
+    'cmi.objectives.n.score.max',
+    'cmi.objectives.n.score.min',
+    'cmi.objectives.n.status',
+    'cmi.student_data._children',
+    'cmi.student_data.mastery_score',
+    'cmi.student_data.max_time_allowed',
+    'cmi.student_data.time_limit_action',
+    'cmi.student_preference._children',
+    'cmi.student_preference.audio',
+    'cmi.student_preference.language',
+    'cmi.student_preference.speed',
+    'cmi.student_preference.text',
+    'cmi.interactions._children',
+    'cmi.interactions._count',
+    'cmi.interactions.n.objectives._count',
+    'cmi.interactions.n.correct_responses._count',
+]
+
 
 @task(name=u'scormxblock.scormxblock.s3_upload', routing_key=settings.HIGH_PRIORITY_QUEUE)
 def s3_upload(all_content, temp_directory, dest_dir):
@@ -73,6 +144,22 @@ def updoad_all_content(temp_directory, fs):
     else:
         # The raw number of files is going to make this request time out. Use celery instead
         s3_upload.apply_async((all_content, temp_directory, dest_dir), serializer='pickle')
+
+
+def validate_property(key, valid_keys):
+
+    words_in_key = key.rsplit(".")
+    len_words = len(words_in_key)
+
+    if len_words == 3:
+        return key in valid_keys
+    elif len_words == 5:
+        new_key = "{}.{}.n.{}.{}".format(words_in_key[0], words_in_key[1], words_in_key[3], words_in_key[4])
+        return new_key in valid_keys
+    elif len_words == 6:
+        new_key = "{}.{}.n.{}.n.{}".format(words_in_key[0], words_in_key[1], words_in_key[3], words_in_key[5])
+        return new_key in valid_keys
+    return False
 
 
 class ScormXBlock(XBlock):
@@ -145,7 +232,9 @@ class ScormXBlock(XBlock):
         frag.add_css(self.resource_string("static/css/scormxblock.css"))
         frag.add_javascript(self.resource_string("static/js/src/scormxblock.js"))
         settings = {
-            'version_scorm': "SCORM_12"
+            'version_scorm': "SCORM_12",
+            'valid_write_data': WRITE_MODEL_DATA,
+            'valid_read_data': READ_MODEL_DATA,
         }
         frag.initialize_js('ScormXBlock', json_args=settings)
         return frag
@@ -206,7 +295,17 @@ class ScormXBlock(XBlock):
             'cmi.suspend_data': self.suspend_data,
         }
 
-        values.update(self.data_scorm)
+        data = {}
+
+        for key, value in self.data_scorm.iteritems():
+            if key in READ_MODEL_DATA:
+                data[key] = value
+            elif key.startswith('cmi.interactions.') and validate_property(key, READ_MODEL_DATA):
+                data[key] = value
+            elif key.startswith('cmi.objectives.') and validate_property(key, READ_MODEL_DATA):
+                data[key] = value
+
+        values.update(data)
         return Response(json.dumps(values), content_type='application/json')
 
     @XBlock.json_handler
@@ -238,11 +337,14 @@ class ScormXBlock(XBlock):
             elif name == 'cmi.suspend_data':
                 self.suspend_data = value
 
-            elif name.startswith('cmi.interactions.'):
+            elif name.startswith('cmi.interactions.') and validate_property(name, WRITE_MODEL_DATA):
                 self.data_scorm['cmi.interactions._count'] = self.data_scorm.get('cmi.interactions._count', 0) + 1
                 self.data_scorm[name] = value
 
-            else:
+            elif name.startswith('cmi.objectives.') and validate_property(name, WRITE_MODEL_DATA):
+                self.data_scorm[name] = value
+
+            elif name in WRITE_MODEL_DATA:
                 self.data_scorm[name] = value
 
         context.update({"completion_status": self.get_completion_status()})
