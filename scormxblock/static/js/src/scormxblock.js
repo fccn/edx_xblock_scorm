@@ -52,7 +52,7 @@ function ScormXBlock(runtime, element, settings) {
     this.SetValue = SetValue;
 
     this.Commit = function() {
-      console.log('LMSCommit')
+      console.log('LMSCommit');
       return StoreValues();
     };
 
@@ -73,7 +73,10 @@ function ScormXBlock(runtime, element, settings) {
   }
 
   var lastError = 301;
-
+  /*
+  * These errors has been taken from
+  * https://scorm.com/scorm-explained/technical-scorm/run-time/run-time-reference/
+  */
   var SCORM_12_ERRORS = {
     '0': 'No Error',
     '101': 'General Exception',
@@ -87,7 +90,6 @@ function ScormXBlock(runtime, element, settings) {
     '404': 'Element is write only',
     '405': 'Incorrect Data Type',
   };
-
   var values = [];
   var LMSValues = {};
 
@@ -105,19 +107,15 @@ function ScormXBlock(runtime, element, settings) {
         values = JSON.parse(response.responseText);
       }
 
-      var value = values[cmi_element];
-
-      if (value==undefined){
-        value = '';
-      }
+      var value = values[cmi_element] ? values[cmi_element]: '';
 
       console.log('Getvalue for ' + cmi_element + ' = ' + value);
       return value
     } else if (settings.valid_write_data.includes(cmi_element)) {
       lastError = 404;
-    } else if (cmi_element.endsWith('_count')){
+    } else if (cmi_element.endsWith('_count')) {
       lastError = 203;
-    } else if (cmi_element.endsWith('_children')){
+    } else if (cmi_element.endsWith('_children')) {
       lastError = 202;
     } else {
       lastError = 401;
@@ -142,7 +140,6 @@ function ScormXBlock(runtime, element, settings) {
       lastError = 401;
     }
     return 'false';
-
   };
 
   var StoreValues = function () {

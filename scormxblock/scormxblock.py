@@ -147,12 +147,24 @@ def updoad_all_content(temp_directory, fs):
 
 
 def validate_property(key, valid_keys):
-
+    """
+    This replaces variable values on the key and verifies if it exist on valid_keys parameter.
+    **Example**
+        key = cmi.objectives.555.id
+        valid_keys = {
+            "cmi.objectives.n.id",
+            "cmi.objectives.n.score"
+        }
+        In this case the new key will be "cmi.objectives.n.id" and it will return True
+    """
     words_in_key = key.rsplit(".")
     len_words = len(words_in_key)
 
     if len_words == 3:
         return key in valid_keys
+    elif len_words == 4:
+        new_key = "{}.{}.n.{}".format(words_in_key[0], words_in_key[1], words_in_key[3])
+        return new_key in valid_keys
     elif len_words == 5:
         new_key = "{}.{}.n.{}.{}".format(words_in_key[0], words_in_key[1], words_in_key[3], words_in_key[4])
         return new_key in valid_keys
@@ -287,6 +299,9 @@ class ScormXBlock(XBlock):
 
     @XBlock.handler
     def scorm_get_values(self, request=None, suffix=None):
+        """
+        This method allows a SCO to retrieve data from the LMS.
+        """
         values = {
             'cmi.core.lesson_status': self.lesson_status,
             'cmi.completion_status': self.lesson_status,
@@ -310,6 +325,9 @@ class ScormXBlock(XBlock):
 
     @XBlock.json_handler
     def scorm_set_values(self, data, suffix=''):
+        """
+        This method allows the SCO to persist data to the LMS
+        """
         context = {'result': 'success'}
 
         for name, value in data.iteritems():
@@ -318,7 +336,6 @@ class ScormXBlock(XBlock):
                 if self.has_score and value in ['completed', 'failed', 'passed']:
                     self.publish_grade()
                     context.update({"lesson_score": self.lesson_score})
-
             elif name == 'cmi.success_status':
                 self.success_status = value
                 if self.has_score:
