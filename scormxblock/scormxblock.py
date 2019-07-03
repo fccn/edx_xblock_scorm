@@ -302,6 +302,12 @@ class ScormXBlock(XBlock):
         """
         This method allows a SCO to retrieve data from the LMS.
         """
+
+        if not self.data_scorm.get('cmi.core.entry'):
+            self.initialize_user_data()
+        else:
+            self.data_scorm['cmi.core.entry'] = 'resume'
+
         values = {
             'cmi.core.lesson_status': self.lesson_status,
             'cmi.completion_status': self.lesson_status,
@@ -359,6 +365,7 @@ class ScormXBlock(XBlock):
                 self.data_scorm[name] = value
 
             elif name.startswith('cmi.objectives.') and validate_property(name, WRITE_MODEL_DATA):
+                self.data_scorm['cmi.objetives._count'] = self.data_scorm.get('cmi.objetives._count', 0) + 1
                 self.data_scorm[name] = value
 
             elif name in WRITE_MODEL_DATA:
@@ -471,6 +478,28 @@ class ScormXBlock(XBlock):
         if self.version_scorm == 'SCORM_2004' and self.success_status != 'unknown':
             completion_status = self.success_status
         return completion_status
+
+    def initialize_user_data(self):
+        """
+        This method initializes the scorm user variables using the student data.
+        """
+        try:
+            user = self.runtime.get_real_user(self.runtime.anonymous_student_id)
+            username = user.username
+            student_id = self.runtime.anonymous_student_id
+        except TypeError:
+            username = ''
+            student_id = ''
+
+        student_data = {
+            'cmi.core.student_id': student_id,
+            'cmi.core.entry': 'ab-initio',
+            'cmi.core.student_name': username,
+            'cmi.core.credit': 'credit' if self.has_score else 'no-credit',
+            'cmi.core.lesson_mode': 'normal',
+        }
+
+        self.data_scorm.update(student_data)
 
     @staticmethod
     def workbench_scenarios():
