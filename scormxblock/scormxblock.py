@@ -237,6 +237,7 @@ class ScormXBlock(XBlock):
         data = pkg_resources.resource_string(__name__, path)
         return data.decode("utf8")
 
+    @XBlock.supports('multi_device') # Mark as mobile-friendly
     def student_view(self, context=None):
         context_html = self.get_context_student()
         template = self.render_template('static/html/scormxblock.html', context_html)
