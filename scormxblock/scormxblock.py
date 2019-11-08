@@ -26,7 +26,7 @@ from xblock.fragment import Fragment
 
 # Make '_' a no-op so we can scrape strings
 _ = lambda text: text
-FILES_THRESHOLD_FOR_ASYNC = 150
+FILES_THRESHOLD_FOR_ASYNC = getattr(settings, 'SCORMXBLOCK_ASYNC_THRESHOLD', 150)
 
 
 @task(name=u'scormxblock.scormxblock.s3_upload', routing_key=settings.HIGH_PRIORITY_QUEUE)
