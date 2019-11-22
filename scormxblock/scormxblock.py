@@ -26,7 +26,7 @@ from xblock.fragment import Fragment
 
 # Make '_' a no-op so we can scrape strings
 _ = lambda text: text
-FILES_THRESHOLD_FOR_ASYNC = 150
+FILES_THRESHOLD_FOR_ASYNC = getattr(settings, 'SCORMXBLOCK_ASYNC_THRESHOLD', 150)
 
 WRITE_MODEL_DATA = [
     'cmi.core.lesson_location',
