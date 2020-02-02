@@ -39,7 +39,7 @@ def s3_upload(all_content, temp_directory, dest_dir):
     bucket = conn.get_bucket(settings.DJFS.get('bucket'))
 
     for filepath in all_content:
-        sourcepath = path.normpath(path.join(temp_directory.root_path, filepath))
+        sourcepath = path.normpath(path.join(temp_directory, filepath))
         destpath = path.normpath(path.join(dest_dir, filepath))
 
         k = boto.s3.key.Key(bucket)
@@ -69,10 +69,10 @@ def updoad_all_content(temp_directory, fs):
 
     if len(all_content) < FILES_THRESHOLD_FOR_ASYNC:
         # We estimate no problem here, just upload the files
-        s3_upload(all_content, temp_directory, dest_dir)
+        s3_upload(all_content, temp_directory.root_path, dest_dir)
     else:
         # The raw number of files is going to make this request time out. Use celery instead
-        s3_upload.apply_async((all_content, temp_directory, dest_dir), serializer='pickle')
+        s3_upload.apply_async((all_content, temp_directory.root_path, dest_dir), serializer='pickle')
 
 
 class ScormXBlock(XBlock):
@@ -176,7 +176,7 @@ class ScormXBlock(XBlock):
             zip_file = zipfile.ZipFile(file, 'r')
 
             # Create a temporaray directory where the zip will extract.
-            temp_directory = TempFS()
+            temp_directory = TempFS(auto_clean=False)
 
             # Extract the files in the temp directory just created.
             zip_file.extractall(temp_directory.root_path)
