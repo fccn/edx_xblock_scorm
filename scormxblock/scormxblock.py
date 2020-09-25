@@ -6,7 +6,7 @@ import re
 import pkg_resources
 import zipfile
 import xml.etree.ElementTree as ET
-import urlparse
+from urllib.parse import urljoin, urlparse, unquote
 import boto
 
 from os import path, walk
@@ -296,7 +296,7 @@ class ScormXBlock(XBlock):
             # Destroy temp directory after all files are copied.
             temp_directory.close()
 
-        return Response(json.dumps({'result': 'success'}), content_type='application/json')
+        return Response({'result': 'success'}, content_type='application/json')
 
     @XBlock.handler
     def scorm_get_values(self, request=None, suffix=None):
@@ -425,9 +425,9 @@ class ScormXBlock(XBlock):
             scorm_file_path = "/{}{}".format(settings.DJFS.get('proxy_root'), proxy_file)
 
         if settings.DJFS.get('remove_signature', False):
-            scorm_file_path = urlparse.urljoin(scorm_file_path, urlparse.urlparse(scorm_file_path).path)
+            scorm_file_path = urljoin(scorm_file_path, urlparse(scorm_file_path).path)
 
-        scorm_file_path = urlparse.unquote(scorm_file_path)
+        scorm_file_path = unquote(scorm_file_path)
 
         return {
             'scorm_file_path': scorm_file_path,
