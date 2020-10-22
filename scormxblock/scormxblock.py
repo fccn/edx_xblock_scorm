@@ -229,7 +229,7 @@ class ScormXBlock(XBlock):
             self.lesson_status = data.get('value')
             if self.has_score and data.get('value') in ['completed', 'failed', 'passed']:
                 self.publish_grade()
-                context.update({"lesson_score": self.lesson_score})
+                context.update({"lesson_score": self.format_lesson_score})
 
         elif name == 'cmi.success_status':
             self.success_status = data.get('value')
@@ -237,11 +237,11 @@ class ScormXBlock(XBlock):
                 if self.success_status == 'unknown':
                     self.lesson_score = 0
                 self.publish_grade()
-                context.update({"lesson_score": self.lesson_score})
+                context.update({"lesson_score": self.format_lesson_score})
 
         elif name in ['cmi.core.score.raw', 'cmi.score.raw'] and self.has_score:
-            self.lesson_score = int(data.get('value', 0))/100.0
-            context.update({"lesson_score": self.lesson_score})
+            self.lesson_score = float(data.get('value', 0))/100.0
+            context.update({"lesson_score": self.format_lesson_score})
 
         elif name == 'cmi.core.lesson_location':
             self.lesson_location = data.get('value', '')
@@ -310,7 +310,7 @@ class ScormXBlock(XBlock):
 
         return {
             'scorm_file_path': scorm_file_path,
-            'lesson_score': self.lesson_score,
+            'lesson_score': self.format_lesson_score,
             'weight': self.weight,
             'has_score': self.has_score,
             'completion_status': self.get_completion_status()
@@ -357,6 +357,10 @@ class ScormXBlock(XBlock):
         if self.version_scorm == 'SCORM_2004' and self.success_status != 'unknown':
             completion_status = self.success_status
         return completion_status
+
+    @property
+    def format_lesson_score(self):
+        return '{:.2f}'.format(self.lesson_score)
 
     @staticmethod
     def workbench_scenarios():
