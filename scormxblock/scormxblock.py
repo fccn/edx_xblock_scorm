@@ -350,7 +350,7 @@ class ScormXBlock(XBlock):
         """
         context = {'result': 'success'}
 
-        for name, value in data.iteritems():
+        for name, value in data.items():
             if name in ['cmi.core.lesson_status', 'cmi.completion_status']:
                 self.lesson_status = value
                 if self.has_score and value in ['completed', 'failed', 'passed']:
