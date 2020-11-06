@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import mimetypes
 import re
 import pkg_resources
 import zipfile
 import xml.etree.ElementTree as ET
 from urllib.parse import urljoin, urlparse, unquote
-import boto
+import boto3
 
 from os import path, walk
 
@@ -26,25 +27,38 @@ from xblock.fragment import Fragment
 # Make '_' a no-op so we can scrape strings
 _ = lambda text: text
 FILES_THRESHOLD_FOR_ASYNC = getattr(settings, 'SCORMXBLOCK_ASYNC_THRESHOLD', 150)
+DEFAULT_CONTENT_TYPE = 'application/octet-stream'
 
 
-@task(name=u'scormxblock.scormxblock.s3_upload', routing_key=settings.HIGH_PRIORITY_QUEUE)
+@task(name='scormxblock.scormxblock.s3_upload', routing_key=settings.HIGH_PRIORITY_QUEUE)
 def s3_upload(all_content, temp_directory, dest_dir):
     """
     Actual handling of the s3 uploads.
-    It uses a direct boto connection for performance reasons
     """
-    conn = boto.connect_s3(settings.DJFS.get('aws_access_key_id'), settings.DJFS.get('aws_secret_access_key'))
-    bucket = conn.get_bucket(settings.DJFS.get('bucket'))
+    session = boto3.Session(
+        aws_access_key_id=settings.DJFS.get('aws_access_key_id'),
+        aws_secret_access_key=settings.DJFS.get('aws_secret_access_key'),
+        region_name=settings.DJFS.get('region_name'),
+    )
+    s3_client = session.resource('s3')
+    bucket = s3_client.Bucket(settings.DJFS.get('bucket'))
 
     for filepath in all_content:
         sourcepath = path.normpath(path.join(temp_directory.root_path, filepath))
         destpath = path.normpath(path.join(dest_dir, filepath))
+        content_type = mimetypes.guess_type(sourcepath)[0]  # Returns a tuple
 
-        k = boto.s3.key.Key(bucket)
-        k.key = destpath
-        k.set_contents_from_filename(sourcepath)
-        # k.set_acl('public-read')  # Slows calls drastically
+        if not content_type:  # It's possible that the type is not in the mimetypes list.
+            content_type = DEFAULT_CONTENT_TYPE
+
+        if isinstance(content_type, bytes):  # In some versions of Python guess_type, it returns bytes instead of str.
+            content_type = content_type.decode('utf-8')
+
+        bucket.upload_file(
+            sourcepath,
+            destpath,
+            ExtraArgs={'ACL': 'public-read', 'ContentType': content_type},
+        )
 
 
 def updoad_all_content(temp_directory, fs):
