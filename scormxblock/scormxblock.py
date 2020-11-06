@@ -46,10 +46,9 @@ def s3_upload(all_content, temp_directory, dest_dir):
     for filepath in all_content:
         sourcepath = path.normpath(path.join(temp_directory.root_path, filepath))
         destpath = path.normpath(path.join(dest_dir, filepath))
-        content_type = mimetypes.guess_type(sourcepath)[0]  # Returns a tuple
 
-        if not content_type:  # It's possible that the type is not in the mimetypes list.
-            content_type = DEFAULT_CONTENT_TYPE
+        # It's possible that the type is not in the mimetypes list.
+        content_type = mimetypes.guess_type(sourcepath)[0]  or DEFAULT_CONTENT_TYPE
 
         if isinstance(content_type, bytes):  # In some versions of Python guess_type, it returns bytes instead of str.
             content_type = content_type.decode('utf-8')
@@ -197,7 +196,7 @@ class ScormXBlock(XBlock):
             manifest_path = '{}/imsmanifest.xml'.format(temp_directory.root_path)
             with open(manifest_path, 'r') as manifest_file:
                 manifest = manifest_file.read()
-            manifest_file.closed
+
             self.set_fields_xblock(manifest)
 
             # Now the part where we copy the data fast fast fast
@@ -336,8 +335,7 @@ class ScormXBlock(XBlock):
             # By standard a namesapace it's a URI
             # we ensure the namespace we got in the tree object it's in fact a URL
             # if not we return an empty namespace and procced to look for resource tag
-            if not namespace.startswith("http"):
-                namespace = None
+            namespace = namespace if namespace.startswith("http") else None
 
             if namespace:
                 resource = tree.find('{{{0}}}resources/{{{0}}}resource'.format(namespace))
