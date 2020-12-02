@@ -15,7 +15,7 @@ from django.conf import settings
 from django.template import Context, Template
 from webob import Response
 
-from celery.task import task
+from celery import task
 from fs.tempfs import TempFS
 from djpyfs import djpyfs
 
@@ -156,7 +156,7 @@ def updoad_all_content(temp_directory, fs):
         s3_upload(all_content, temp_directory, dest_dir)
     else:
         # The raw number of files is going to make this request time out. Use celery instead
-        s3_upload.apply_async((all_content, temp_directory, dest_dir), serializer='pickle')
+        s3_upload.delay(all_content, temp_directory, dest_dir)
 
 
 def validate_property(key, valid_keys):
