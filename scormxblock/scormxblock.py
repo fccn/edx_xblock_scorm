@@ -36,6 +36,8 @@ def s3_upload(all_content, temp_directory, dest_dir):
     """
     Actual handling of the s3 uploads.
     """
+    if not isinstance(temp_directory, str):
+        temp_directory = temp_directory.root_path
     session = boto3.Session(
         aws_access_key_id=settings.DJFS.get('aws_access_key_id'),
         aws_secret_access_key=settings.DJFS.get('aws_secret_access_key'),
@@ -45,7 +47,7 @@ def s3_upload(all_content, temp_directory, dest_dir):
     bucket = s3_client.Bucket(settings.DJFS.get('bucket'))
 
     for filepath in all_content:
-        sourcepath = path.normpath(path.join(temp_directory.root_path, filepath))
+        sourcepath = path.normpath(path.join(temp_directory, filepath))
         destpath = path.normpath(path.join(dest_dir, filepath))
 
         # It's possible that the type is not in the mimetypes list.
@@ -82,7 +84,7 @@ def updoad_all_content(temp_directory, fs):
         s3_upload(all_content, temp_directory, dest_dir)
     else:
         # The raw number of files is going to make this request time out. Use celery instead
-        s3_upload.delay(all_content, temp_directory, dest_dir)
+        s3_upload.delay(all_content, temp_directory.root_path, dest_dir)
 
 
 class ScormXBlock(XBlock):
