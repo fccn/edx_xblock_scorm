@@ -36,13 +36,14 @@ def s3_upload(all_content, temp_directory, dest_dir):
     """
     Actual handling of the s3 uploads.
     """
-    session = boto3.Session(
-        aws_access_key_id=settings.DJFS.get('aws_access_key_id'),
-        aws_secret_access_key=settings.DJFS.get('aws_secret_access_key'),
-        region_name=settings.DJFS.get('region_name'),
+    s3 = boto3.resource('s3',
+                        aws_access_key_id=settings.DJFS.get('aws_access_key_id'),
+                        aws_secret_access_key=settings.DJFS.get('aws_secret_access_key'),
+                        endpoint_url=settings.DJFS.get('endpoint_url'),
+                        region_name=settings.DJFS.get('region_name'),
     )
-    s3_client = session.resource('s3')
-    bucket = s3_client.Bucket(settings.DJFS.get('bucket'))
+
+    bucket = s3.Bucket(settings.DJFS.get('bucket'))
 
     for filepath in all_content:
         sourcepath = path.normpath(path.join(temp_directory.root_path, filepath))
