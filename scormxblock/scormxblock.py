@@ -138,7 +138,14 @@ class ScormXBlock(XBlock):
         scope=Scope.settings
     )
     icon_class = String(
-        default="video",
+        default="other",
+        display_name=_("Icon"),
+        help=_("Change icon"),
+        values=[
+            { "value": "video",   "display_name": "Video"   },
+            { "value": "other",   "display_name": "Other"   },
+            { "value": "problem", "display_name": "Problem" }
+        ],
         scope=Scope.settings,
     )
 
@@ -181,7 +188,9 @@ class ScormXBlock(XBlock):
 
         self.display_name = request.params['display_name']
         self.has_score = request.params['has_score']
-        self.icon_class = 'problem' if self.has_score == 'True' else 'video'
+        self.icon_class = request.params['icon_class']
+        if not self.icon_class:
+            self.icon_class = 'problem' if self.has_score == 'True' else 'video'
         if hasattr(request.params['file'], 'file'):
             file = request.params['file'].file
             zip_file = zipfile.ZipFile(file, 'r')
@@ -285,7 +294,9 @@ class ScormXBlock(XBlock):
             'display_name_value': self.display_name,
             'field_scorm_file': self.fields['scorm_file'],
             'field_has_score': self.fields['has_score'],
-            'has_score_value': self.has_score
+            'has_score_value': self.has_score,
+            'field_icon_class': self.fields['icon_class'],
+            'icon_class_value': self.icon_class
         }
 
     def get_context_student(self):

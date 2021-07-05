@@ -24,6 +24,17 @@
       </div>
       <span class="tip setting-help">{{ field_has_score.help }}</span>
     </li>
+    <li class="field comp-setting-entry is-set">
+      <div class="wrapper-comp-setting">
+        <label class="label setting-label" for="icon_class">{{ field_icon_class.display_name }}</label>
+        <select name="icon_class" id="icon_class">
+          {% for option in field_icon_class.values %}
+          <option value="{{ option.value }}" {% if option.value == icon_class_value %}selected{% endif %}>{{ option.display_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <span class="tip setting-help">{{ field_icon_class.help }}</span>
+    </li>
 
   </ul>
   <div class="xblock-actions">

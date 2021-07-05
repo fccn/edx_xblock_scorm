@@ -7,9 +7,11 @@ function ScormStudioXBlock(runtime, element) {
     var file_data = $(element).find('#scorm_file').prop('files')[0];
     var display_name = $(element).find('input[name=display_name]').val();
     var has_score = $(element).find('select[name=has_score]').val();
+    var icon_class = $(element).find('select[name=icon_class]').val();
     form_data.append('file', file_data);
     form_data.append('display_name', display_name);
     form_data.append('has_score', has_score);
+    form_data.append('icon_class', icon_class);
     runtime.notify('save', {state: 'start'});
 
     $.ajax({
